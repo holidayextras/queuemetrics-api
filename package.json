@@ -18,5 +18,8 @@
   "homepage": "https://github.com/holidayextras/queuemetrics-api#readme",
   "dependencies": {
     "node-toolbox": "github:holidayextras/node-toolbox"
+  },
+  "config": {
+    "port": 8765
   }
 }
