@@ -4,13 +4,16 @@ const request = require('request')
 const util = require('util')
 
 app.get('/api/aliases/fetch', async (req, res) => {
-  if (!req.query || !req.query.queue || !req.query.did) return res.status(400).send({ error: 'MISSING_PARAMS' })
+  if (!req.query || !req.query.aliases) return res.status(400).send({ error: 'MISSING_PARAMS' })
+  let aliases = req.query.aliases
+  if (typeof aliases === 'string') aliases = aliases.split(/[|,]/)
   let result = null
-  const value = `%${req.query.queue}.${req.query.did}%`
   try {
-    result = await database.query(`SELECT \`id_coda\`, \`nome_coda\`, \`composizione_coda\` FROM \`code_possibili\` WHERE \`composizione_coda\` LIKE ?`, [value])
+    // result = await database.query(`SELECT \`id_coda\`, \`nome_coda\`, \`composizione_coda\` FROM \`code_possibili\` WHERE \`composizione_coda\` LIKE ?`, [value])
+    result = await database.query(`SELECT \`id_coda\`, \`nome_coda\`, \`composizione_coda\` FROM \`code_possibili\` WHERE \`nome_coda\` in (${aliases.map(() => '?')})`, aliases)
+
   } catch (e) {
-    console.log('Failed to fetch aliases from the database')
+    console.log('Failed to fetch aliases from the database', e)
     return res.status(500).send({ error: 'DATABASE_FAILED' })
   }
   return res.status(200).send(result)
@@ -22,7 +25,7 @@ app.post('/api/aliases/update', async (req, res) => {
   if (typeof aliases === 'string') aliases = aliases.split(/[|,]/)
   let currData
   try {
-    const fetchResponse = await util.promisify(request.get)(`http://localhost:${process.env.SERVER_PORT || 8765}/api/aliases/fetch?queue=${req.body.queue}&did=${req.body.did}`)
+    const fetchResponse = await util.promisify(request.get)(`http://localhost:${process.env.SERVER_PORT || 8765}/api/aliases/fetch?aliases=${aliases.join('|')}`)
     currData = JSON.parse(fetchResponse.body)
   } catch (e) {
     console.log('Failed to fetch the current data for each nome_coda', e)
@@ -86,7 +89,6 @@ app.post('/api/aliases/update', async (req, res) => {
       ]
     }
   })
-
   let connection
   let results = []
   try {
