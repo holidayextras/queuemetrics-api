@@ -1,7 +1,10 @@
 const app = require('../server.js')
-const { database } = require('node-toolbox')
+const { database, meta } = require('node-toolbox')
 const request = require('request')
 const util = require('util')
+
+const cidApiHostUrl = meta.isDevelopment ? 'http://localhost:8766' : '???'
+const qmApiHostUrl = meta.isDevelopment ? 'http://localhost:8765' : '???'
 
 app.get('/api/aliases/fetch', async (req, res) => {
   if (!req.query || !req.query.aliases) return res.status(400).send({ error: 'MISSING_PARAMS' })
@@ -25,7 +28,7 @@ app.post('/api/aliases/update', async (req, res) => {
   if (typeof aliases === 'string') aliases = aliases.split(/[|,]/)
   let currData
   try {
-    const fetchResponse = await util.promisify(request.get)(`http://localhost:${process.env.SERVER_PORT || 8765}/api/aliases/fetch?aliases=${aliases.join('|')}`)
+    const fetchResponse = await util.promisify(request.get)(`${qmApiHostUrl}/api/aliases/fetch?aliases=${aliases.join('|')}`)
     currData = JSON.parse(fetchResponse.body)
   } catch (e) {
     console.log('Failed to fetch the current data for each nome_coda', e)
@@ -36,7 +39,7 @@ app.post('/api/aliases/update', async (req, res) => {
 
   let cid = 'DEFAULTCID'
   try {
-    const fetchResponse = await util.promisify(request.get)(`http://localhost:8766/api/cid/fetch/fromdid?did=${req.body.did}`)
+    const fetchResponse = await util.promisify(request.get)(`${cidApiHostUrl}/api/cid/fetch/fromdid?did=${req.body.did}`)
     cid = JSON.parse(fetchResponse.body).result
   } catch (e) {
     console.log('Failed to fetch the CID from DID', req.body.did, e)
