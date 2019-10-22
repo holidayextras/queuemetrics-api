@@ -3,106 +3,75 @@ const { database, meta } = require('node-toolbox')
 const request = require('request')
 const util = require('util')
 
-const cidApiHostUrl = meta.isDevelopment ? 'http://localhost:8766' : '???'
-const qmApiHostUrl = meta.isDevelopment ? 'http://localhost:8765' : '???'
+const qmApiHostUrl = meta.isDevelopment ? 'http://localhost:8765' : '???' // Needs to be a real URL when deployment is figured out
 
 app.get('/api/aliases/fetch', async (req, res) => {
-  if (!req.query || !req.query.aliases) return res.status(400).send({ error: 'MISSING_PARAMS' })
-  let aliases = req.query.aliases
-  if (typeof aliases === 'string') aliases = aliases.split(/[|,]/)
+  if (!req.query || !req.query.targetCode) return res.status(400).send({ error: 'MISSING_PARAMS' })
   let result = null
   try {
-    // result = await database.query(`SELECT \`id_coda\`, \`nome_coda\`, \`composizione_coda\` FROM \`code_possibili\` WHERE \`composizione_coda\` LIKE ?`, [value])
-    result = await database.query(`SELECT \`id_coda\`, \`nome_coda\`, \`composizione_coda\` FROM \`code_possibili\` WHERE \`nome_coda\` in (${aliases.map(() => '?')})`, aliases)
-
+    result = await database.query(`SELECT \`id_coda\`, \`nome_coda\`, \`composizione_coda\` FROM \`code_possibili\` WHERE \`nome_coda\` LIKE ?`, [`${req.query.targetCode}`])
   } catch (e) {
-    console.log('Failed to fetch aliases from the database', e)
+    console.log('Failed to fetch alias data from the database', e)
     return res.status(500).send({ error: 'DATABASE_FAILED' })
   }
-  return res.status(200).send(result)
+  return res.status(200).send({ result })
 })
 
 app.post('/api/aliases/update', async (req, res) => {
-  if (!req.body || !req.body.queue || !req.body.did || !req.body.aliases) return res.status(400).send({ error: 'MISSING_PARAMS' })
+  if (!req.body || !req.body.targetCode || !req.body.aliases) return res.status(400).send({ error: 'MISSING_PARAMS' })
   let aliases = req.body.aliases
-  if (typeof aliases === 'string') aliases = aliases.split(/[|,]/)
+  if (typeof req.body.aliases === 'string') aliases = req.body.aliases.split(/[|,]/)
   let currData
   try {
-    const fetchResponse = await util.promisify(request.get)(`${qmApiHostUrl}/api/aliases/fetch?aliases=${aliases.join('|')}`)
+    const fetchResponse = await util.promisify(request.get)(`${qmApiHostUrl}/api/aliases/fetch?targetCode=${req.body.targetCode}`)
     currData = JSON.parse(fetchResponse.body)
   } catch (e) {
-    console.log('Failed to fetch the current data for each nome_coda', e)
+    console.log('Failed to fetch the current data for the target nome_coda', e)
     return res.status(400).send({ error: 'QM_API_QUERY_FAILED' })
   } finally {
     if (currData && currData.error) return res.status(400).send({ error: 'QM_API_QUERY_FAILED' })
   }
+  const target = (currData.result && currData.result[0]) || { nome_coda: req.body.targetCode }
 
-  let cid = 'DEFAULTCID'
-  try {
-    const fetchResponse = await util.promisify(request.get)(`${cidApiHostUrl}/api/cid/fetch/fromdid?did=${req.body.did}`)
-    cid = JSON.parse(fetchResponse.body).result
-  } catch (e) {
-    console.log('Failed to fetch the CID from DID', req.body.did, e)
-    return res.status(400).send({ error: 'CID_API_QUERY_FAILED' })
+  let combinedData
+  if (target.composizione_coda) combinedData = [].concat(target.composizione_coda.split('|'), aliases)
+  else combinedData = aliases
+  const dedupedString = [...new Set(combinedData)].join('|')
+  let sql = { query: '', values: [] }
+  if (target.id_coda) {
+    sql.query = `UPDATE \`code_possibili\` SET \`composizione_coda\` = ? WHERE id_coda = ?`
+    sql.values = [dedupedString, target.id_coda]
+  } else {
+    sql.query = require('../sql/baseInsert.js'),
+    sql.values = [
+      target.nome_coda,
+      dedupedString,
+      ' ',
+      ' ',
+      ' ',
+      ' ',
+      ' ',
+      'inbound',
+      1,
+      '',
+      0,
+      0,
+      '',
+      0,
+      0,
+      '',
+      0,
+      (new Date().toISOString()).replace('T', ' ').slice(0, -1),
+      (new Date().toISOString()).replace('T', ' ').slice(0, -1)
+    ]
   }
 
-  if (cid.endsWith(':')) cid = cid.slice(0, -1)
-  else return res.status(200).send({ error: 'CID_INVALID', cid })
-
-  const sqlToExecute = aliases.map(currAlias => {
-    const newVal = `${req.body.queue}.${req.body.did}_${cid}`
-    let updateTarget = {
-      nome_coda: currAlias,
-      composizione_coda: ''
-    }
-    const targetIndex = currData.findIndex(d => d.nome_coda === currAlias)
-    if (targetIndex !== -1) updateTarget = currData[currData.findIndex(d => d.nome_coda === currAlias)]
-    let combined = []
-    if (updateTarget.composizione_coda) combined = [].concat(updateTarget.composizione_coda.split('|'), [newVal])
-    else combined = [newVal]
-    const dedupedFinal = [...new Set(combined)].join('|')
-
-    // We know this has been pulled from the currData
-    if (updateTarget.id_coda) return {
-      query: `UPDATE \`code_possibili\` SET \`composizione_coda\` = ? WHERE id_coda = ?`,
-      values: [dedupedFinal, updateTarget.id_coda]
-    }
-    return {
-      query: require('../sql/baseInsert.js'),
-      values: [
-        updateTarget.nome_coda,
-        dedupedFinal,
-        ' ',
-        ' ',
-        ' ',
-        ' ',
-        ' ',
-        'inbound',
-        1,
-        '',
-        0,
-        0,
-        '',
-        0,
-        0,
-        '',
-        0,
-        (new Date().toISOString()).replace('T', ' ').slice(0, -1),
-        (new Date().toISOString()).replace('T', ' ').slice(0, -1)
-      ]
-    }
-  })
-  let connection
-  let results = []
   try {
-    connection = await database.transaction()
-    for (let sql of sqlToExecute) {
-      results.push(await connection.query(sql.query, sql.values))
-    }
-    await connection.commit
+    await database.query(sql.query, sql.values)
   } catch (e) {
-    if (connection) await connection.rollback()
-    return res.status(500).send({ error: 'DATABASE_SAVE_FAILED' })
+    console.log('Failed to insert/update composizione_coda(s)', target, aliases)
+    return res.status(400).send({ error: 'DATABASE_FAILED' })
   }
-  return res.status(200).send({ msg: 'ok' })
+
+  return res.status(200).send()
 })
