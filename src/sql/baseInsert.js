@@ -1,4 +1,4 @@
-module.exports = `INSERT INTO \`code_possibili\` (
+module.exports = `INSERT INTO \`code_possibili_chiffer\` (
   \`nome_coda\`,
   \`composizione_coda\`,
   \`agenti_membri\`,

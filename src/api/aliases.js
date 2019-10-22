@@ -9,7 +9,7 @@ app.get('/api/aliases/fetch', async (req, res) => {
   if (!req.query || !req.query.targetCode) return res.status(400).send({ error: 'MISSING_PARAMS' })
   let result = null
   try {
-    result = await database.query(`SELECT \`id_coda\`, \`nome_coda\`, \`composizione_coda\` FROM \`code_possibili\` WHERE \`nome_coda\` LIKE ?`, [`${req.query.targetCode}`])
+    result = await database.query(`SELECT \`id_coda\`, \`nome_coda\`, \`composizione_coda\` FROM \`code_possibili_chiffer\` WHERE \`nome_coda\` LIKE ?`, [`${req.query.targetCode}`])
   } catch (e) {
     console.log('Failed to fetch alias data from the database', e)
     return res.status(500).send({ error: 'DATABASE_FAILED' })
@@ -39,7 +39,7 @@ app.post('/api/aliases/update', async (req, res) => {
   const dedupedString = [...new Set(combinedData)].join('|')
   let sql = { query: '', values: [] }
   if (target.id_coda) {
-    sql.query = `UPDATE \`code_possibili\` SET \`composizione_coda\` = ? WHERE id_coda = ?`
+    sql.query = `UPDATE \`code_possibili_chiffer\` SET \`composizione_coda\` = ? WHERE id_coda = ?`
     sql.values = [dedupedString, target.id_coda]
   } else {
     sql.query = require('../sql/baseInsert.js'),
