@@ -1,9 +1,7 @@
 const app = require('../server.js')
-const { database, meta } = require('node-toolbox')
+const { database } = require('node-toolbox')
 const request = require('request')
 const util = require('util')
-
-const qmApiHostUrl = meta.isDevelopment ? 'http://localhost:8765' : '???' // Needs to be a real URL when deployment is figured out
 
 app.get('/api/aliases/fetch', async (req, res) => {
   if (!req.query || !req.query.targetCode) return res.status(400).send({ error: 'MISSING_PARAMS' })
@@ -23,7 +21,7 @@ app.post('/api/aliases/update', async (req, res) => {
   if (typeof req.body.aliases === 'string') aliases = req.body.aliases.split(/[|,]/)
   let currData
   try {
-    const fetchResponse = await util.promisify(request.get)(`${qmApiHostUrl}/api/aliases/fetch?targetCode=${req.body.targetCode}`)
+    const fetchResponse = await util.promisify(request.get)(`${process.env.QM_API_URL}/api/aliases/fetch?targetCode=${req.body.targetCode}`)
     currData = JSON.parse(fetchResponse.body)
   } catch (e) {
     console.log('Failed to fetch the current data for the target nome_coda', e)
