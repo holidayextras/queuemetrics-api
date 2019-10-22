@@ -1,10 +1,15 @@
 {
   "name": "queuemetrics-api",
+  "platform": "custom",
+  "owner": "telephony",
+  "ci": "dockyard",
   "version": "1.0.0",
   "description": "An API for reaching the queuemetrics database",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"No test specified\"",
+    "ci": "echo \"No CI to perfrom\"",
+    "deploy": "/bin/bash ./.scripts/deploy.sh"
   },
   "repository": {
     "type": "git",
