@@ -1,7 +1,7 @@
 {
   "name": "queuemetrics-api",
   "platform": "custom",
-  "owner": "telephony",
+  "owner": "customer-platform",
   "ci": "dockyard",
   "version": "1.0.0",
   "description": "An API for reaching the queuemetrics database",
